@@ -1,0 +1,250 @@
+#!/usr/bin/perl -w
+
+#
+# Copyright (C) 2012 Michael Bussman <support@mb-net.net>
+#
+# Nagios plugin to check FHEM readings
+#
+
+use strict;
+use warnings;
+
+use lib "/usr/lib/nagios/plugins";
+
+use utils qw(%ERRORS $TIMEOUT &print_revision &support &usage);
+use POSIX qw(strftime difftime);
+use Getopt::Long qw(:config no_ignore_case);
+use File::Basename;
+use Net::Telnet();
+use Date::Parse;
+
+my $prog_name = basename $0;
+my $prog_ver = "1.0";
+
+my @warn_val;
+my @crit_val;
+
+my $warn_age = 30 * 60;		# 30m
+my $crit_age = 90 * 60;		# 1.5h
+
+my $help_val = 0;
+my $verb_val = 0;
+my $vers_val = 0;
+my $host_val = "";
+my $port_val = 7072;
+my $read_val = "";
+my $dev_val = "";
+
+# Gives us a way to print out verbose debug information to the screen when user
+# passes in a -v argument.
+# print_debug() should receive one parameter: a text string to print out.
+sub print_debug() {
+	my $message = shift;
+	if ($verb_val == 1) {
+		print "DEBUG: " . $message . "\n";
+	}
+}
+
+sub show_help() {
+	print <<END;
+$prog_name FHEM plugin $prog_ver (c) 2012 Michael Bussmann <support\@mb-net.net>
+
+Perl Check FHEM readings
+
+Usage: $prog_name -H hostaddress [-p port] [-w min,max] [-c min,max] [-a warnage] [-A critage]
+
+-H, --host
+	FHEM host to connect to
+-p, --port
+	Port to connect to (default: 7072)
+-w, --warning <min,max>
+	Warning threshold
+-c, --critical <min,max>
+	Critical threshold
+-d, --device
+	Device(s)
+-r, --reading
+	Reading
+-V, --version
+	Output version information for the plugin
+-v, --verbose
+	Enable verbose output
+-h, --help
+	Show this help
+END
+}
+
+GetOptions (
+	"H=s" => \$host_val, "host=s" => \$host_val,
+	"p=i" => \$port_val, "port=i" => \$port_val,
+	'w=s' => \@warn_val, 'warning=s' => \@warn_val,
+	"c=s" => \@crit_val, "critical=s" => \@crit_val,
+	"a=i" => \$warn_age, "age_warning=i" => \$warn_age,
+	"A=i" => \$crit_age, "age_critical=i" => \$crit_age,
+	"d=s" => \$dev_val, "device=s" => \$dev_val,
+	"r=s" => \$read_val, "readinf=s" => \$read_val,
+	"h" => \$help_val, "help" => \$help_val,
+	"V" => \$vers_val, "version" => \$vers_val,
+	"v" => \$verb_val, "verbose" => \$verb_val,
+);
+@warn_val=split(/,/,join(',',@warn_val));
+@crit_val=split(/,/,join(',',@crit_val));
+
+#
+# Sanity checks
+#
+if ($help_val != 0) {
+	&show_help;
+	exit $ERRORS{'OK'};
+}
+
+if ($vers_val != 0) {
+	&print_revision($prog_name,$prog_ver);
+	exit $ERRORS{'OK'};
+}
+
+if ($host_val eq "") {
+	print "ERROR Missing hostname\n";
+	exit $ERRORS{"UNKNOWN"};
+}
+if ($read_val eq "") {
+	print "ERROR Missing readings\n";
+	exit $ERRORS{"UNKNOWN"};
+}
+if ($dev_val eq "") {
+	print "ERROR Missing device\n";
+	exit $ERRORS{"UNKNOWN"};
+}
+unless (@warn_val){
+	print "ERROR no warning threshold\n";
+	exit $ERRORS{"UNKNOWN"};
+}
+unless (@crit_val){
+	print "ERROR no critical threshold\n";
+	exit $ERRORS{"UNKNOWN"};
+}
+
+if ($warn_val[0]>=$warn_val[1]) {
+	print "ERROR warn thres min>=max\n";
+	exit $ERRORS{"UNKNOWN"};
+}
+if ($crit_val[0]>=$crit_val[1]) {
+	print "ERROR crit thres min>=max\n";
+	exit $ERRORS{"UNKNOWN"};
+}
+if ($warn_val[0]<$crit_val[0]) {
+	print "ERROR warn thres min < crit thres min\n";
+	exit $ERRORS{"UNKNOWN"};
+}
+if ($warn_val[1]>$crit_val[1]) {
+	print "ERROR warn thres max > crit thres max\n";
+	exit $ERRORS{"UNKNOWN"};
+}
+if ($warn_age>=$crit_age) {
+	print "ERROR warn_age>=crit_age\n";
+	exit $ERRORS{"UNKNOWN"};
+}
+
+
+&print_debug("FHEM command: list $dev_val $read_val");
+
+my @fhemin;
+my $line;
+my $telnet;
+my $result = "";
+my $exitcode = $ERRORS{"OK"};
+
+$telnet = new Net::Telnet (Timeout => 10, Prompt => '/fhem> /i', Errmode=>\&telnet_handler);
+
+$telnet->open(Host => "$host_val", Port=> "$port_val");
+$telnet->cmd("");
+###$telnet->input_log("check_fhem.chat");
+
+@fhemin = $telnet->cmd("list $dev_val $read_val");
+foreach (@fhemin) {
+	my ($e2num, $e2txt);
+
+	chop;
+	next if ($_ eq "");
+
+	($e2num, $e2txt)=&parse_reading($_);
+	if ($e2num==$ERRORS{"CRITICAL"}) {
+		$exitcode=$ERRORS{"CRITICAL"};
+	}
+	if (($e2num==$ERRORS{"WARNING"}) && ($exitcode==$ERRORS{"OK"})) {
+		$exitcode=$ERRORS{"WARNING"};
+	}
+	$result.=$e2txt;
+}
+$telnet->close;
+
+$result=~tr/\n/ /;
+
+if ($exitcode==$ERRORS{"WARNING"}) {
+	print "WARNING - $result";
+} elsif ($exitcode==$ERRORS{"CRITICAL"}) {
+	print "CRITICAL - $result";
+} elsif ($exitcode==$ERRORS{"OK"}) {
+	print "OK - $result";
+} else {
+	print "UNKNOWN - $result";
+}
+exit($exitcode);
+
+sub parse_reading($)
+{
+	my ($dev, $date, $time, $reading);
+	my ($dt, $tm);
+	my ($age);
+	my $exitcode = undef;
+	my $msg="";
+
+	($dev, $date, $time, $reading) = split(' ');
+	$age=time()-str2time("${date}T${time}");
+
+	#
+	# Perform checks
+	#
+	&print_debug("Checking $dev ($reading): Age $age (W=$warn_age, C=$crit_age); Wmin=$warn_val[0], Wmax=$warn_val[1], Cmin=$crit_val[0], Cmax=$crit_val[1])");
+
+	# Critical
+	if ($age>=$crit_age) {
+		$msg.="$dev CRITICAL: stale for ${age}s\n";
+		$exitcode=$ERRORS{"CRITICAL"};
+	}
+	if ($reading<=$crit_val[0]) {
+		$msg.="$dev CRITICAL: $reading below $crit_val[0]\n";
+		$exitcode=$ERRORS{"CRITICAL"};
+	}
+	if ($reading>=$crit_val[1]) {
+		$msg.="$dev CRITICAL: $reading exceeds $crit_val[1]\n";
+		$exitcode=$ERRORS{"CRITICAL"};
+	}
+	if (defined($exitcode)) { return($exitcode, $msg); }
+
+	# Warning
+	if ($age>=$warn_age) {
+		$msg.="$dev WARNING: stale for ${age}s\n";
+		$exitcode=$ERRORS{"WARNING"};
+	}
+	if ($reading<=$warn_val[0]) {
+		$msg.="$dev WARNING: $reading below $warn_val[0]\n";
+		$exitcode=$ERRORS{"WARNING"};
+	}
+	if ($reading>=$warn_val[1]) {
+		$msg.="$dev WARNING: $reading exceeds $warn_val[1]\n";
+		$exitcode=$ERRORS{"WARNING"};
+	}
+	if (defined($exitcode)) { return($exitcode, $msg); }
+
+	$msg.="$dev ($reading, ${age}s)\n";
+	return($ERRORS{"OK"}, $msg);
+}
+
+sub telnet_handler($)
+{
+	if ( $@ ne "") {
+		print "UNKNOWN - $@\n";
+	}
+	exit($ERRORS{"UNKNOWN"});
+}
