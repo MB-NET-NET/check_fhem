@@ -1,0 +1,35 @@
+#
+# 2012-02-18 Michael Bussmann <support@mb-net.net>
+#
+# Display the temperature and the humidity values of a KS300.
+#
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics nomirror
+set y2tics
+set title '<L1>'
+set grid
+
+set ylabel "Humidity (%)"
+set format y "%0.1f"
+
+set y2label "Temperature (C)"
+
+#FileLog 4:T\x3a:0:
+#FileLog 6:H\x3a:0:
+#FileLog 14:DP\x3a:0:
+#FileLog 16:AH\x3a:0:
+
+plot \
+  "< awk '/T:/ {print $1, $4}' <IN>"\
+     using 1:2 axes x1y2 title 'Temperature (C)' with lines lw 2,\
+  "< awk '/H:/ {print $1, $6}' <IN>"\
+     using 1:2 axes x1y1 title 'Humidity (%)' with lines lw 1,\
+  "< awk '/DP:/ {print $1, $14}' <IN>"\
+     using 1:2 axes x1y2 title 'Dewpoint (C)' with lines lw 1,\
+  "< awk '/AH:/ {print $1, $16}' <IN>"\
+     using 1:2 axes x1y2 title 'HumAbs (g/m^3)' with lines lw 1,\
