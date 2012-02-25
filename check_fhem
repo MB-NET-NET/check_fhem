@@ -181,13 +181,13 @@ $telnet->close;
 $result=~tr/\n/ /;
 
 if ($exitcode==$ERRORS{"WARNING"}) {
-	print "WARNING - $result";
+	print "WARNING - $result\n";
 } elsif ($exitcode==$ERRORS{"CRITICAL"}) {
-	print "CRITICAL - $result";
+	print "CRITICAL - $result\n";
 } elsif ($exitcode==$ERRORS{"OK"}) {
-	print "OK - $result";
+	print "OK - $result\n";
 } else {
-	print "UNKNOWN - $result";
+	print "UNKNOWN - $result\n";
 }
 exit($exitcode);
 
