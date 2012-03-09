@@ -124,12 +124,12 @@ unless (@crit_val){
 	exit $ERRORS{"UNKNOWN"};
 }
 
-if ($warn_val[0]>=$warn_val[1]) {
-	print "ERROR warn thres min>=max\n";
+if ($warn_val[0]>$warn_val[1]) {
+	print "ERROR warn thres min>max\n";
 	exit $ERRORS{"UNKNOWN"};
 }
-if ($crit_val[0]>=$crit_val[1]) {
-	print "ERROR crit thres min>=max\n";
+if ($crit_val[0]>$crit_val[1]) {
+	print "ERROR crit thres min>max\n";
 	exit $ERRORS{"UNKNOWN"};
 }
 if ($warn_val[0]<$crit_val[0]) {
@@ -208,30 +208,30 @@ sub parse_reading($)
 	&print_debug("Checking $dev ($reading): Age $age (W=$warn_age, C=$crit_age); Wmin=$warn_val[0], Wmax=$warn_val[1], Cmin=$crit_val[0], Cmax=$crit_val[1])");
 
 	# Critical
-	if ($age>=$crit_age) {
+	if ($age>$crit_age) {
 		$msg.="$dev CRITICAL: stale for ${age}s\n";
 		$exitcode=$ERRORS{"CRITICAL"};
 	}
-	if ($reading<=$crit_val[0]) {
+	if ($reading<$crit_val[0]) {
 		$msg.="$dev CRITICAL: $reading below $crit_val[0]\n";
 		$exitcode=$ERRORS{"CRITICAL"};
 	}
-	if ($reading>=$crit_val[1]) {
+	if ($reading>$crit_val[1]) {
 		$msg.="$dev CRITICAL: $reading exceeds $crit_val[1]\n";
 		$exitcode=$ERRORS{"CRITICAL"};
 	}
 	if (defined($exitcode)) { return($exitcode, $msg); }
 
 	# Warning
-	if ($age>=$warn_age) {
+	if ($age>$warn_age) {
 		$msg.="$dev WARNING: stale for ${age}s\n";
 		$exitcode=$ERRORS{"WARNING"};
 	}
-	if ($reading<=$warn_val[0]) {
+	if ($reading<$warn_val[0]) {
 		$msg.="$dev WARNING: $reading below $warn_val[0]\n";
 		$exitcode=$ERRORS{"WARNING"};
 	}
-	if ($reading>=$warn_val[1]) {
+	if ($reading>$warn_val[1]) {
 		$msg.="$dev WARNING: $reading exceeds $warn_val[1]\n";
 		$exitcode=$ERRORS{"WARNING"};
 	}
