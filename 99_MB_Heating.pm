@@ -5,10 +5,22 @@
 #		http://mb-net.net/
 #
 
+package main;
+
+use strict;
+use warnings;
+use POSIX;
+
+sub
+MB_Heating_Initialize($$)
+{
+  my ($hash) = @_;
+}
+
 my $thres_heat	= 20;
 my $thres_off	= 10;
 
-sub check_heating()
+sub check_heating($$@)
 {
 	my ($dummy, $actor, @FHTs) = @_;
 
@@ -25,6 +37,8 @@ sub check_heating()
 		# Extrahieren des Ventilstandes
 		my $ventil=ReadingsVal($_, "actuator", "101%");
 		$ventil=(substr($ventil, 0, (length($ventil)-1)));
+
+		Log 3, "MB_Heating: FHT $_: Ventilstellung $ventil";
 
 		# Entscheidung ob Wärme benötigt wird (Ja, wenn mindestens
 		# ein Ventil mehr als $thres_heat geöffnet ist)
@@ -62,10 +76,11 @@ sub check_heating()
 	#
 	# Regelmaessige Updates des logfiles
 	#
-	if (Value("$dummy") eq "on") {
-		fhem("set $dummy on")
-	} else {
-		fhem("set $dummy off")
-	}
+#	if (Value("$dummy") eq "on") {
+#		fhem("set $dummy on")
+#	} else {
+#		fhem("set $dummy off")
+#	}
 }	# check_heating
 
+1;
