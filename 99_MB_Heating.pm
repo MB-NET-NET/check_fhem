@@ -8,14 +8,16 @@
 my $thres_heat	= 20;
 my $thres_off	= 10;
 
-sub check_heating_1()
+sub check_heating()
 {
+	my ($dummy, $actor, @FHTs) = @_;
+
 	# Start des Heizungsprogramms
 	my $waermebedarf = 0;
 	my $leerlauf = 0;
 
 	# Kopieren aller Werte der Raumthermostaten in das Array @FHTs
-	my @FHTs=devspec2array("model=HM-CC-TC");
+	###my @FHTs=devspec2array("model=HM-CC-TC");
 
 	# Abfrage aller Aktuatoren
 	foreach(@FHTs) {
@@ -43,15 +45,15 @@ sub check_heating_1()
 	if ($waermebedarf>0) {
 		Log 3, "MB_Heating: Signalisiere Waermebedarf an Heizung";
 
-		# fhem("set <1wire> On");
-		fhem("set EG_HEATING on");
+		# fhem("set $actor On");
+		fhem("set $dummy on");
 	} else {
 		# Heizung abschalten, wenn alle Ventile im Leerlauf.
 		if ($leerlauf == @FHTs) {
 			Log 3,"MB_Heating: Keine Wärme (mehr) benoetigt.";
 
-			# fhem("set <1wire> output Heizung Off");
-			fhem("set EG_HEATING off");
+			# fhem("set $actor output Heizung Off");
+			fhem("set $dummy off");
 		} else {
 			Log 3,"MB_Heating: Heizbedarf: $leerlauf of " . @FHTs . " actuators are idle.";
 		}	# ELSE leerlauf
@@ -60,10 +62,10 @@ sub check_heating_1()
 	#
 	# Regelmaessige Updates des logfiles
 	#
-	if (Value("EG_HEATING") eq "on") {
-		fhem("set EG_HEATING on")
+	if (Value("$dummy") eq "on") {
+		fhem("set $dummy on")
 	} else {
-		fhem("set EG_HEATING off")
+		fhem("set $dummy off")
 	}
-}	# check_heating_1
+}	# check_heating
 
