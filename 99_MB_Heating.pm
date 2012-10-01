@@ -17,14 +17,13 @@ MB_Heating_Initialize($$)
   my ($hash) = @_;
 }
 
-my $thres_heat	= 20;
-my $thres_off	= 10;
+my $thres_heat	= 25;
+my $thres_off	= 15;
 
 sub check_heating($$@)
 {
 	my ($dummy, $actor, @FHTs) = @_;
 
-	# Start des Heizungsprogramms
 	my $waermebedarf = 0;
 	my $leerlauf = 0;
 
@@ -40,47 +39,37 @@ sub check_heating($$@)
 
 		Log 3, "MB_Heating: FHT $_: Ventilstellung $ventil";
 
-		# Entscheidung ob Wärme benötigt wird (Ja, wenn mindestens
-		# ein Ventil mehr als $thres_heat geöffnet ist)
 		if ($ventil >= $thres_heat) {
 			$waermebedarf++;
 		}
 
-		# Hysterese zur Abschaltung der Heizung (Heizung aus,
-		# wenn alle Ventile weniger als $thres_off geöffnet sind)
 		if ($ventil < $thres_off) {
 			$leerlauf++;
 		}
 	}	# foreach
 
-	Log 1,"MB_Heating: Waermebedarf: ${waermebedarf}, Leerlauf: $leerlauf";
+	Log 1,"MB_Heating: Wärmeanforderung: ${waermebedarf}, Leerlauf: $leerlauf";
 
 	# Steuerbefehl für Heizung
 	if ($waermebedarf>0) {
-		Log 3, "MB_Heating: Signalisiere Waermebedarf an Heizung";
+		Log 3, "MB_Heating: Signalisiere Wärmeanforderung";
 
-		# fhem("set $actor On");
 		fhem("set $dummy on");
 	} else {
 		# Heizung abschalten, wenn alle Ventile im Leerlauf.
 		if ($leerlauf == @FHTs) {
 			Log 3,"MB_Heating: Keine Wärme (mehr) benoetigt.";
-
-			# fhem("set $actor output Heizung Off");
 			fhem("set $dummy off");
 		} else {
-			Log 3,"MB_Heating: Heizbedarf: $leerlauf of " . @FHTs . " actuators are idle.";
+			Log 3,"MB_Heating: $leerlauf of " . @FHTs . " actuators are idle.";
+			# Send last state
+			if (Value("$dummy") eq "on") {
+				fhem("set $dummy on")
+			} else {
+				fhem("set $dummy off")
+			}
 		}	# ELSE leerlauf
 	}	# ELSE wärmebedarf
-
-	#
-	# Regelmaessige Updates des logfiles
-	#
-#	if (Value("$dummy") eq "on") {
-#		fhem("set $dummy on")
-#	} else {
-#		fhem("set $dummy off")
-#	}
 }	# check_heating
 
 1;
