@@ -17,47 +17,52 @@ MB_Heating_Initialize($$)
   my ($hash) = @_;
 }
 
-my $thres_heat	= 25;
-my $thres_off	= 15;
+my $thres_heat	= 17;
+my $thres_off	= 10;
 
 sub check_heating($$@)
 {
 	my ($dummy, $actor, @FHTs) = @_;
 
 	my $waermebedarf = 0;
+	my $temp_low = 0;
 	my $leerlauf = 0;
 
-	# Kopieren aller Werte der Raumthermostaten in das Array @FHTs
-	###my @FHTs=devspec2array("model=HM-CC-TC");
+	my $ventil_summe = 0;
 
 	# Abfrage aller Aktuatoren
 	foreach(@FHTs) {
 
-		# Extrahieren des Ventilstandes
+		# Extrahieren des Readings
 		my $ventil=ReadingsVal($_, "actuator", "101%");
 		$ventil=(substr($ventil, 0, (length($ventil)-1)));
+		my $desired=ReadingsVal($_, "desired-temp", "20");
+		my $measured=ReadingsVal($_, "measured-temp", "20");
+		$measured=(substr($measured, 0, (length($measured)-10)));	# XXX: FIXME
 
-		Log 3, "MB_Heating: FHT $_: Ventilstellung $ventil";
+		Log 3, "MB_Heating: FHT $_: A=$ventil D=$desired M=$measured";
 
-		if ($ventil >= $thres_heat) {
+		$ventil_summe+=$ventil;
+
+		# Wärmebedarf: Ventilstellung>$thres oder Tempdiff>0.6 C
+		if ( ($ventil >= $thres_heat) || (($desired-$measured)>0.6) ) {
 			$waermebedarf++;
 		}
-
-		if ($ventil < $thres_off) {
+		if ( ($ventil < $thres_off) || (($desired-$measured)<0.2) ) {
 			$leerlauf++;
 		}
 	}	# foreach
 
-	Log 1,"MB_Heating: Wärmeanforderung: ${waermebedarf}, Leerlauf: $leerlauf";
+	Log 1,"MB_Heating: Wärmeanforderung: ${waermebedarf}, Leerlauf: ${leerlauf}, VS=${ventil_summe}";
 
 	# Steuerbefehl für Heizung
-	if ($waermebedarf>0) {
+	if (($waermebedarf>0) || ($ventil_summe>35)) {
 		Log 3, "MB_Heating: Signalisiere Wärmeanforderung";
 
 		fhem("set $dummy on");
 	} else {
 		# Heizung abschalten, wenn alle Ventile im Leerlauf.
-		if ($leerlauf == @FHTs) {
+		if (($leerlauf == @FHTs) || ($ventil_summe<7)) {
 			Log 3,"MB_Heating: Keine Wärme (mehr) benoetigt.";
 			fhem("set $dummy off");
 		} else {
