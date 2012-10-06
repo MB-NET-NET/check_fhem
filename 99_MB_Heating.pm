@@ -17,8 +17,8 @@ MB_Heating_Initialize($$)
   my ($hash) = @_;
 }
 
-my $thres_heat	= 17;
-my $thres_off	= 10;
+my $thres_heat	= 15;
+my $thres_off	= 9;
 
 sub check_heating($$@)
 {
@@ -48,7 +48,7 @@ sub check_heating($$@)
 		if ( ($ventil >= $thres_heat) || (($desired-$measured)>0.6) ) {
 			$waermebedarf++;
 		}
-		if ( ($ventil < $thres_off) || (($desired-$measured)<0.2) ) {
+		if ( ($ventil < $thres_off)) {
 			$leerlauf++;
 		}
 	}	# foreach
