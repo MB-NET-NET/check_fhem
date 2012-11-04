@@ -1,0 +1,35 @@
+#
+# Vorlau/Rücklauf Temperatur
+#
+# 2012-11-04 Michael Bussmann <support@mb-net.net>
+#
+# Filelog example:
+# define FileLog /var/log/fhem/OW_VLRL_OGR-%Y.log OW_(VL|RL)_OGR:temperature:.*
+#
+# Logfile:
+# 2012-11-04_11:00:02 OW_VL_OGL temperature: 48.2500 (Celsius)
+# 2012-11-04_11:00:04 OW_RL_OGL temperature: 35.6875 (Celsius)
+#
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set y2tics
+set title '<L1>'
+set grid xtics y2tics
+
+set y2label "Temperature [C]"
+
+#FileLog 4:OW_VL_:0:
+#FileLog 4:OW_RL_:0:
+
+plot \
+  "< awk '/OW_VL_/ {print $1, $4}' <IN>" using 1:2 axes x1y1 title 'Vorlauf' with lines,\
+  "< awk '/OW_RL_/ {print $1, $4}' <IN>" using 1:2 axes x1y1 title 'Ruecklauf' with lines
