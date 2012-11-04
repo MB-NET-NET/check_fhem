@@ -38,7 +38,6 @@ sub check_heating($$@)
 		$ventil=(substr($ventil, 0, (length($ventil)-1)));
 		my $desired=ReadingsVal($_, "desired-temp", "20");
 		my $measured=ReadingsVal($_, "measured-temp", "20");
-		$measured=(substr($measured, 0, (length($measured)-10)));	# XXX: FIXME
 
 		Log 3, "MB_Heating: FHT $_: A=$ventil D=$desired M=$measured";
 
