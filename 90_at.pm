@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 90_at.pm 1098 2011-11-12 07:51:08Z rudolfkoenig $
+# $Id: 90_at.pm 1892 2012-09-27 07:08:41Z rudolfkoenig $
 package main;
 
 use strict;
@@ -15,11 +15,13 @@ at_Initialize($)
   $hash->{DefFn}    = "at_Define";
   $hash->{UndefFn}  = "at_Undef";
   $hash->{AttrFn}   = "at_Attr";
-  $hash->{AttrList} = "disable:0,1 skip_next:0,1 loglevel:0,1,2,3,4,5,6";
+  $hash->{StateFn}  = "at_State";
+  $hash->{AttrList} = "disable:0,1 skip_next:0,1 loglevel:0,1,2,3,4,5,6 ".
+                      "alignTime";
 }
 
 
-my $at_tdiff;
+my $oldattr;
 
 #####################################
 sub
@@ -30,7 +32,7 @@ at_Define($$)
 
   if(!$command) {
     if($hash->{OLDDEF}) { # Called from modify, where command is optional
-      RemoveInternalTimer($name);
+      RemoveInternalTimer($hash);
       (undef, $command) = split("[ \t]+", $hash->{OLDDEF}, 2);
       $hash->{DEF} = "$tm $command";
     } else {
@@ -47,7 +49,8 @@ at_Define($$)
   $rep = "" if(!defined($rep));
   $cnt = "" if(!defined($cnt));
 
-  my $ot = gettimeofday();
+  my $ot = $data{AT_TRIGGERTIME} ? $data{AT_TRIGGERTIME} : gettimeofday();
+  $ot = int($ot) if(!$rel);     # No way to specify subseconds
   my @lt = localtime($ot);
   my $nt = $ot;
 
@@ -55,7 +58,6 @@ at_Define($$)
                         if($rel ne "+");
   $nt += ($hr*3600+$min*60+$sec); # Plus relative time
   $nt += SecondsTillTomorrow($ot) if($ot >= $nt);  # Do it tomorrow...
-  $nt += $at_tdiff if(defined($at_tdiff));
 
   @lt = localtime($nt);
   my $ntm = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
@@ -70,11 +72,10 @@ at_Define($$)
   }
   $hash->{NTM} = $ntm if($rel eq "+" || $fn);
   $hash->{TRIGGERTIME} = $nt;
-  RemoveInternalTimer($name);
-  InternalTimer($nt, "at_Exec", $name, 0);
+  RemoveInternalTimer($hash);
+  InternalTimer($nt, "at_Exec", $hash, 0);
 
-  $hash->{STATE} = ("Next: " . FmtDateTime($nt))
-     if(!($attr{$name} && $attr{$name}{disable}));
+  $hash->{STATE} = ($oldattr && $oldattr->{disable} ? "disabled" : ("Next: ".FmtDateTime($nt)));
   
   return undef;
 }
@@ -83,18 +84,21 @@ sub
 at_Undef($$)
 {
   my ($hash, $name) = @_;
-  RemoveInternalTimer($name);
+  $hash->{DELETED} = 1;
+  RemoveInternalTimer($hash);
   return undef;
 }
 
 sub
 at_Exec($)
 {
-  my ($name) = @_;
+  my ($hash) = @_;
   my ($skip, $disable) = ("","");
 
-  return if(!$defs{$name});           # Just deleted
-  Log GetLogLevel($name,5), "exec at command $name";
+  return if($hash->{DELETED});           # Just deleted
+  my $name = $hash->{NAME};
+  my $ll5 = GetLogLevel($name,5);
+  Log $ll5, "exec at command $name";
 
   if(defined($attr{$name})) {
     $skip    = 1 if($attr{$name} && $attr{$name}{skip_next});
@@ -102,50 +106,111 @@ at_Exec($)
   }
 
   delete $attr{$name}{skip_next} if($skip);
-  my (undef, $command) = split("[ \t]+", $defs{$name}{DEF}, 2);
+  my (undef, $command) = split("[ \t]+", $hash->{DEF}, 2);
   $command = SemicolonEscape($command);
   my $ret = AnalyzeCommandChain(undef, $command) if(!$skip && !$disable);
   Log GetLogLevel($name,3), $ret if($ret);
 
-  return if(!$defs{$name});           # Deleted in the Command
+  return if($hash->{DELETED});           # Deleted in the Command
 
-  my $count = $defs{$name}{REP};
-  my $def = $defs{$name}{DEF};
+  my $count = $hash->{REP};
+  my $def = $hash->{DEF};
 
-  my $oldattr = $attr{$name};           # delete removes the attributes too
+  $oldattr = $attr{$name};           # delete removes the attributes too
 
-  # Correct drift when the timespec is relative
-  $at_tdiff = $defs{$name}{TRIGGERTIME}-gettimeofday() if($def =~ m/^\+/);
+  # Avoid drift when the timespec is relative
+  $data{AT_TRIGGERTIME} = $hash->{TRIGGERTIME} if($def =~ m/^\+/);
+
+  my $oldCfgfn = $hash->{CFGFN};
+  my $oldNr    = $hash->{NR};
   CommandDelete(undef, $name);          # Recreate ourselves
 
   if($count) {
     $def =~ s/{\d+}/{$count}/ if($def =~ m/^\+?\*{\d+}/);  # Replace the count
-    Log GetLogLevel($name,5), "redefine at command $name as $def";
+    Log $ll5, "redefine at command $name as $def";
 
     $data{AT_RECOMPUTE} = 1;                 # Tell sunrise compute the next day
     CommandDefine(undef, "$name at $def");   # Recompute the next TRIGGERTIME
     delete($data{AT_RECOMPUTE});
     $attr{$name} = $oldattr;
+    $hash->{CFGFN} = $oldCfgfn if($oldCfgfn);
+    $hash->{NR} = $oldNr;
+    $oldattr = undef;
   }
-  $at_tdiff = undef;
+  delete($data{AT_TRIGGERTIME});
 }
 
 sub
 at_Attr(@)
 {
-  my @a = @_;
+  my ($cmd, $name, $attrName, $attrVal) = @_;
   my $do = 0;
 
-  if($a[0] eq "set" && $a[2] eq "disable") {
-    $do = (!defined($a[3]) || $a[3]) ? 1 : 2;
+  my $hash = $defs{$name};
+
+  if($cmd eq "set" && $attrName eq "alignTime") {
+    return "alignTime needs a list of timespec parameters" if(!$attrVal);
+    my ($alErr, $alHr, $alMin, $alSec, undef) = GetTimeSpec($attrVal);
+    return "$name alignTime: $alErr" if($alErr);
+
+    my ($tm, $command) = split("[ \t]+", $hash->{DEF}, 2);
+    $tm =~ m/^(\+)?(\*({\d+})?)?(.*)$/;
+    my ($rel, $rep, $cnt, $tspec) = ($1, $2, $3, $4);
+    return "startTimes: $name is not relative" if(!$rel);
+    my (undef, $hr, $min, $sec, undef) = GetTimeSpec($tspec);
+
+    my $alTime = ($alHr*60+$alMin)*60+$alSec;
+    my $step = ($hr*60+$min)*60+$sec;
+    my $ttime = int($hash->{TRIGGERTIME});
+    my $off = ($ttime % 86400) - 86400;
+    while($off < $alTime) {
+      $off += $step;
+    }
+    $ttime += ($alTime-$off);
+    $ttime += $step if($ttime < time());
+
+    RemoveInternalTimer($hash);
+    InternalTimer($ttime, "at_Exec", $hash, 0);
+    $hash->{TRIGGERTIME} = $ttime;
+    $hash->{STATE} = "Next: " . FmtTime($ttime);
   }
-  $do = 2 if($a[0] eq "del" && (!$a[2] || $a[2] eq "disable"));
+
+  if($cmd eq "set" && $attrName eq "disable") {
+    $do = (!defined($attrVal) || $attrVal) ? 1 : 2;
+  }
+  $do = 2 if($cmd eq "del" && (!$attrName || $attrName eq "disable"));
   return if(!$do);
-
-  $defs{$a[1]}{STATE} = ($do == 1 ?
+  $hash->{STATE} = ($do == 1 ?
         "disabled" :
-        "Next: " . FmtTime($defs{$a[1]}{TRIGGERTIME}));
+        "Next: " . FmtTime($hash->{TRIGGERTIME}));
 
+  return undef;
+}
+
+#############
+# Adjust one-time relative at's after reboot, the execution time is stored as
+# state
+sub
+at_State($$$$)
+{
+  my ($hash, $tim, $vt, $val) = @_;
+
+  return undef if($hash->{DEF} !~ m/^\+\d/ ||
+                  $val !~ m/Next: (\d\d):(\d\d):(\d\d)/);
+
+  my ($h, $m, $s) = ($1, $2, $3);
+  my $then = ($h*60+$m)*60+$s;
+  my $now = time();
+  my @lt = localtime($now);
+  my $ntime = ($lt[2]*60+$lt[1])*60+$lt[0];
+  return undef if($ntime > $then); 
+
+  my $name = $hash->{NAME};
+  RemoveInternalTimer($hash);
+  InternalTimer($now+$then-$ntime, "at_Exec", $hash, 0);
+  $hash->{NTM} = "$h:$m:$s";
+  $hash->{STATE} = $val;
+  
   return undef;
 }
 

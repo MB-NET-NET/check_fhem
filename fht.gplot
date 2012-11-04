@@ -1,3 +1,10 @@
+#
+# 2012-02-18 Michael Bussmann <support@mb-net.net>
+#
+# Based upon fht.gplot
+#
+# Display the measured temp, actuator and desired temp
+
 ############################
 # Display the measured temp and the actuator.
 # Corresponding FileLog definition: 

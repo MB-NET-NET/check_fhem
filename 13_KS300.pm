@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 13_KS300.pm 1098 2011-11-12 07:51:08Z rudolfkoenig $
+# $Id: 13_KS300.pm 1404 2012-04-01 17:50:56Z borisneubert $
 package main;
 
 use strict;
@@ -239,7 +239,8 @@ KS300_Parse($$)
 
     for(my $i = 0; $i < $max; $i++) {
       $r->{$txt[$i]}{TIME} = $tm;
-      $val = "$v[$i] $sfx[$i]";
+      #$val = "$v[$i] $sfx[$i]";
+      $val = $v[$i];
       $r->{$txt[$i]}{VAL} = $val;
       $def->{CHANGED}[$n++] = "$txt[$i]: $val"
                 if(defined($repchanged{$txt[$i]}));
