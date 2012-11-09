@@ -21,26 +21,32 @@ use Date::Parse;
 my $prog_name = basename $0;
 my $prog_ver = "1.0";
 
-my @warn_val;
-my @crit_val;
+# Flags
+my $helpp = 0;
+my $verbp = 0;
+my $versp = 0;
 
-my $warn_age = 30 * 60;		# 30m
-my $crit_age = 90 * 60;		# 1.5h
-
-my $help_val = 0;
-my $verb_val = 0;
-my $vers_val = 0;
+# Parameter
 my $host_val = "";
 my $port_val = 7072;
 my $read_val = "";
 my $dev_val = "";
+
+my @warn_val;
+my @crit_val;
+my $warn_text;
+my $crit_text;
+
+my $warn_age = 30 * 60;		# 30m
+my $crit_age = 90 * 60;		# 1.5h
+
 
 # Gives us a way to print out verbose debug information to the screen when user
 # passes in a -v argument.
 # print_debug() should receive one parameter: a text string to print out.
 sub print_debug() {
 	my $message = shift;
-	if ($verb_val == 1) {
+	if ($verbp == 1) {
 		print "DEBUG: " . $message . "\n";
 	}
 }
@@ -57,14 +63,20 @@ Usage: $prog_name -H hostaddress [-p port] [-w min,max] [-c min,max] [-a warnage
 	FHEM host to connect to
 -p, --port
 	Port to connect to (default: 7072)
+
 -w, --warning <min,max>
 	Warning threshold
 -c, --critical <min,max>
 	Critical threshold
+-C, --crit-text <string>
+	Raises critical status if reading!=string
+-W, --warn-text <string>
+	Raises warning status if reading!=string
 -d, --device
 	Device(s)
 -r, --reading
 	Reading
+
 -V, --version
 	Output version information for the plugin
 -v, --verbose
@@ -79,13 +91,15 @@ GetOptions (
 	"p=i" => \$port_val, "port=i" => \$port_val,
 	'w=s' => \@warn_val, 'warning=s' => \@warn_val,
 	"c=s" => \@crit_val, "critical=s" => \@crit_val,
+	"W=s" => \$warn_text, "warn-text=s" => \$warn_text,
+	"C=s" => \$crit_text, "crit-text=s" => \$crit_text,
 	"a=i" => \$warn_age, "age_warning=i" => \$warn_age,
 	"A=i" => \$crit_age, "age_critical=i" => \$crit_age,
 	"d=s" => \$dev_val, "device=s" => \$dev_val,
 	"r=s" => \$read_val, "readinf=s" => \$read_val,
-	"h" => \$help_val, "help" => \$help_val,
-	"V" => \$vers_val, "version" => \$vers_val,
-	"v" => \$verb_val, "verbose" => \$verb_val,
+	"h" => \$helpp, "help" => \$helpp,
+	"V" => \$versp, "version" => \$versp,
+	"v" => \$verbp, "verbose" => \$verbp,
 );
 @warn_val=split(/,/,join(',',@warn_val));
 @crit_val=split(/,/,join(',',@crit_val));
@@ -93,12 +107,12 @@ GetOptions (
 #
 # Sanity checks
 #
-if ($help_val != 0) {
+if ($helpp != 0) {
 	&show_help;
 	exit $ERRORS{'OK'};
 }
 
-if ($vers_val != 0) {
+if ($versp != 0) {
 	&print_revision($prog_name,$prog_ver);
 	exit $ERRORS{'OK'};
 }
@@ -115,36 +129,20 @@ if ($dev_val eq "") {
 	print "ERROR Missing device\n";
 	exit $ERRORS{"UNKNOWN"};
 }
-unless (@warn_val){
-	print "ERROR no warning threshold\n";
-	exit $ERRORS{"UNKNOWN"};
-}
-unless (@crit_val){
-	print "ERROR no critical threshold\n";
-	exit $ERRORS{"UNKNOWN"};
-}
 
-if ($warn_val[0]>$warn_val[1]) {
+if (@warn_val && ($warn_val[0]>$warn_val[1])) {
 	print "ERROR warn thres min>max\n";
 	exit $ERRORS{"UNKNOWN"};
 }
-if ($crit_val[0]>$crit_val[1]) {
+if (@crit_val && ($crit_val[0]>$crit_val[1])) {
 	print "ERROR crit thres min>max\n";
 	exit $ERRORS{"UNKNOWN"};
 }
-if ($warn_val[0]<$crit_val[0]) {
-	print "ERROR warn thres min < crit thres min\n";
-	exit $ERRORS{"UNKNOWN"};
-}
-if ($warn_val[1]>$crit_val[1]) {
-	print "ERROR warn thres max > crit thres max\n";
-	exit $ERRORS{"UNKNOWN"};
-}
+
 if ($warn_age>=$crit_age) {
 	print "ERROR warn_age>=crit_age\n";
 	exit $ERRORS{"UNKNOWN"};
 }
-
 
 &print_debug("FHEM command: list $dev_val $read_val");
 
@@ -191,6 +189,9 @@ if ($exitcode==$ERRORS{"WARNING"}) {
 }
 exit($exitcode);
 
+#
+# Parse readings
+#
 sub parse_reading($)
 {
 	my ($dev, $date, $time, $reading);
@@ -205,20 +206,26 @@ sub parse_reading($)
 	#
 	# Perform checks
 	#
-	&print_debug("Checking $dev ($reading): Age $age (W=$warn_age, C=$crit_age); Wmin=$warn_val[0], Wmax=$warn_val[1], Cmin=$crit_val[0], Cmax=$crit_val[1])");
 
 	# Critical
 	if ($age>$crit_age) {
 		$msg.="$dev CRITICAL: stale for ${age}s\n";
 		$exitcode=$ERRORS{"CRITICAL"};
 	}
-	if ($reading<$crit_val[0]) {
-		$msg.="$dev CRITICAL: $reading below $crit_val[0]\n";
+
+	if (($crit_text) && ($reading!~/$crit_text/)) {
+		$msg.="$dev CRITICAL: $read_val is $crit_text\n";
 		$exitcode=$ERRORS{"CRITICAL"};
 	}
-	if ($reading>$crit_val[1]) {
-		$msg.="$dev CRITICAL: $reading exceeds $crit_val[1]\n";
-		$exitcode=$ERRORS{"CRITICAL"};
+	if (@crit_val) {
+		if ($reading<$crit_val[0]) {
+			$msg.="$dev CRITICAL: $reading below $crit_val[0]\n";
+			$exitcode=$ERRORS{"CRITICAL"};
+		}
+		if ($reading>$crit_val[1]) {
+			$msg.="$dev CRITICAL: $reading exceeds $crit_val[1]\n";
+			$exitcode=$ERRORS{"CRITICAL"};
+		}
 	}
 	if (defined($exitcode)) { return($exitcode, $msg); }
 
@@ -227,13 +234,19 @@ sub parse_reading($)
 		$msg.="$dev WARNING: stale for ${age}s\n";
 		$exitcode=$ERRORS{"WARNING"};
 	}
-	if ($reading<$warn_val[0]) {
-		$msg.="$dev WARNING: $reading below $warn_val[0]\n";
+	if (($warn_text) && ($reading!~/$warn_text/)) {
+		$msg.="$dev WARNING: $read_val is $warn_text\n";
 		$exitcode=$ERRORS{"WARNING"};
 	}
-	if ($reading>$warn_val[1]) {
-		$msg.="$dev WARNING: $reading exceeds $warn_val[1]\n";
-		$exitcode=$ERRORS{"WARNING"};
+	if (@warn_val) {
+		if ($reading<$warn_val[0]) {
+			$msg.="$dev WARNING: $reading below $warn_val[0]\n";
+			$exitcode=$ERRORS{"WARNING"};
+		}
+		if ($reading>$warn_val[1]) {
+			$msg.="$dev WARNING: $reading exceeds $warn_val[1]\n";
+			$exitcode=$ERRORS{"WARNING"};
+		}
 	}
 	if (defined($exitcode)) { return($exitcode, $msg); }
 
