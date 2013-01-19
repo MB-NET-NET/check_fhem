@@ -34,8 +34,8 @@ my $dev_val = "";
 
 my @warn_val;
 my @crit_val;
-my $warn_text;
-my $crit_text;
+my $warn_text = undef;
+my $crit_text = undef;
 
 my $warn_age = 30 * 60;		# 30m
 my $crit_age = 90 * 60;		# 1.5h
@@ -53,7 +53,7 @@ sub print_debug() {
 
 sub show_help() {
 	print <<END;
-$prog_name FHEM plugin $prog_ver (c) 2012 Michael Bussmann <support\@mb-net.net>
+$prog_name FHEM plugin $prog_ver (c) 2013 Michael Bussmann <support\@mb-net.net>
 
 Perl Check FHEM readings
 
@@ -203,6 +203,8 @@ sub parse_reading($)
 	($dev, $date, $time, $reading) = split(' ');
 	$age=time()-str2time("${date}T${time}");
 
+	&print_debug("Read: D=$dev, Date=$date, Time=$time, R=$reading");
+
 	#
 	# Perform checks
 	#
@@ -213,8 +215,8 @@ sub parse_reading($)
 		$exitcode=$ERRORS{"CRITICAL"};
 	}
 
-	if (($crit_text) && ($reading!~/$crit_text/)) {
-		$msg.="$dev CRITICAL: $read_val is $crit_text\n";
+	if (defined($crit_text) && ($reading!~/$crit_text/)) {
+		$msg.="$dev CRITICAL: $read_val is not $crit_text\n";
 		$exitcode=$ERRORS{"CRITICAL"};
 	}
 	if (@crit_val) {
@@ -234,8 +236,8 @@ sub parse_reading($)
 		$msg.="$dev WARNING: stale for ${age}s\n";
 		$exitcode=$ERRORS{"WARNING"};
 	}
-	if (($warn_text) && ($reading!~/$warn_text/)) {
-		$msg.="$dev WARNING: $read_val is $warn_text\n";
+	if (defined($warn_text) && ($reading!~/$warn_text/)) {
+		$msg.="$dev WARNING: $read_val is not $warn_text\n";
 		$exitcode=$ERRORS{"WARNING"};
 	}
 	if (@warn_val) {
