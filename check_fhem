@@ -216,7 +216,7 @@ sub parse_reading($)
 	}
 
 	if (defined($crit_text) && ($reading!~/$crit_text/)) {
-		$msg.="$dev CRITICAL: $read_val is not $crit_text\n";
+		$msg.="$dev CRITICAL: $read_val is $reading (not $crit_text)\n";
 		$exitcode=$ERRORS{"CRITICAL"};
 	}
 	if (@crit_val) {
@@ -237,7 +237,7 @@ sub parse_reading($)
 		$exitcode=$ERRORS{"WARNING"};
 	}
 	if (defined($warn_text) && ($reading!~/$warn_text/)) {
-		$msg.="$dev WARNING: $read_val is not $warn_text\n";
+		$msg.="$dev WARNING: $read_val is $reading (not $warn_text)\n";
 		$exitcode=$ERRORS{"WARNING"};
 	}
 	if (@warn_val) {
