@@ -1,0 +1,21 @@
+# Created by FHEM/98_SVG.pm, 2014-01-20 14:45:44
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<TL>'
+set ytics
+set y2tics
+set grid xtics y2tics
+set ylabel "Momentanleistung [kW]"
+set y2label "Tagesverbrauch [kWh]"
+set yrange [0:]
+set y2range [0:]
+
+#DbLog <SPEC1>:gasleistung:0:
+#DbLog <SPEC1>:gastagesverbrauch:0:
+
+plot \
+  ls l0 axes x1y1 title 'Momentanleistung [kW]' with lines lw 2, \
+  ls l2fill axes x1y2 title 'Tagesverbrauch [kWh]' with lines

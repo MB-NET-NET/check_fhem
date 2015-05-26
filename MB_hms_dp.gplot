@@ -21,20 +21,20 @@ set y2tics
 set title '<L1>'
 set grid xtics y2tics
 
-set y2label "Temperature [C]"
-set ylabel "Humidity [%]"
+set y2label "Temperatur [C]"
+set ylabel "Luftfeuchte rel. [%]"
 
 #FileLog 4:T\x3a:0:
 #FileLog 6:H\x3a:0:
-#FileLog 8:DP\x3a:0:
-#FileLog 10:AH\x3a:0:
+#FileLog 8:D\x3a:0:
+#FileLog 10:A\x3a:0:
 
 plot \
   "< awk '/T:/ {print $1, $4}' <IN>"\
      using 1:2 ls l0 axes x1y2 title 'Temperature (C)' with lines,\
   "< awk '/H:/ {print $1, $6}' <IN>"\
      using 1:2 axes x1y1 title 'Humidity (%)' with lines,\
-  "< awk '/DP:/ {print $1, $8}' <IN>"\
+  "< awk '/D:/ {print $1, $8}' <IN>"\
      using 1:2 axes x1y2 title 'Dewpoint (C)' with lines,
-  "< awk '/AH:/ {print $1, $10}' <IN>"\
+  "< awk '/A:/ {print $1, $10}' <IN>"\
      using 1:2 axes x1y2 title 'HumAbs (g/m^3)' with lines,
