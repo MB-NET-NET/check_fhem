@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 #
-# Copyright (C) 2012 Michael Bussman <support@mb-net.net>
+# Copyright (C) 2012-2015 Michael Bussman <support@mb-net.net>
 #
 # Nagios plugin to check FHEM readings
 #
@@ -19,7 +19,7 @@ use Net::Telnet();
 use Date::Parse;
 
 my $prog_name = basename $0;
-my $prog_ver = "1.0";
+my $prog_ver = "1.1";
 
 # Flags
 my $helpp = 0;
@@ -37,45 +37,60 @@ my @crit_val;
 my $warn_text = undef;
 my $crit_text = undef;
 
-my $warn_age = 30 * 60;		# 30m
-my $crit_age = 90 * 60;		# 1.5h
+my $warn_age = undef;
+my $crit_age = undef;
 
 
 # Gives us a way to print out verbose debug information to the screen when user
 # passes in a -v argument.
 # print_debug() should receive one parameter: a text string to print out.
-sub print_debug() {
+sub print_debug(@) {
 	my $message = shift;
 	if ($verbp == 1) {
 		print "DEBUG: " . $message . "\n";
 	}
 }
 
+
+sub is_real_number($)
+{
+    my $num = shift;
+    return 1 if ($num =~ /^-?\d+\.?\d*$/);
+    return 0;
+}
+
 sub show_help() {
 	print <<END;
-$prog_name FHEM plugin $prog_ver (c) 2013 Michael Bussmann <support\@mb-net.net>
+$prog_name FHEM plugin $prog_ver (c) 2012-2015 Michael Bussmann <support\@mb-net.net>
 
 Perl Check FHEM readings
 
 Usage: $prog_name -H hostaddress [-p port] [-w min,max] [-c min,max] [-a warnage] [-A critage]
 
 -H, --host
-	FHEM host to connect to
+	FHEM host to connect to (mandatory)
 -p, --port
 	Port to connect to (default: 7072)
 
 -w, --warning <min,max>
-	Warning threshold
+	Warning threshold (mandatory)
 -c, --critical <min,max>
-	Critical threshold
--C, --crit-text <string>
-	Raises critical status if reading!=string
+	Critical threshold (mandatory)
+
 -W, --warn-text <string>
-	Raises warning status if reading!=string
+	Raises warning status if reading!=string (optional)
+-C, --crit-text <string>
+	Raises critical status if reading!=string (optional)
+
+-a, --age_warning <s>
+	Raises warning status if reading is stale for <s> seconds (optional)
+-A, --age_critical <s>
+	Raises critical status if reading is stale for <s> seconds (optional)
+
 -d, --device
-	Device(s)
+	Device(s) (mandatory)
 -r, --reading
-	Reading
+	Reading (mandatory)
 
 -V, --version
 	Output version information for the plugin
@@ -130,16 +145,44 @@ if ($dev_val eq "") {
 	exit $ERRORS{"UNKNOWN"};
 }
 
-if (@warn_val && ($warn_val[0]>$warn_val[1])) {
-	print "ERROR warn thres min>max\n";
-	exit $ERRORS{"UNKNOWN"};
+if (@warn_val) {
+    	unless (scalar(@warn_val)==2) {
+	    	print 'ERROR: warn syntax is <min>,<max>\n';
+		exit $ERRORS{"UNKNOWN"};
+	}
+    	unless (is_real_number($warn_val[0])) {
+	    	print "ERROR: warn min must be numeric\n";
+		exit $ERRORS{"UNKNOWN"};
+	}
+    	unless (is_real_number($warn_val[1])) {
+	    	print "ERROR: warn max must be numeric\n";
+		exit $ERRORS{"UNKNOWN"};
+	}
+   	if ($warn_val[0]>$warn_val[1]) {
+		print "ERROR warn thres min>max\n";
+		exit $ERRORS{"UNKNOWN"};
+	}
 }
-if (@crit_val && ($crit_val[0]>$crit_val[1])) {
-	print "ERROR crit thres min>max\n";
-	exit $ERRORS{"UNKNOWN"};
+if (@crit_val) {
+    	unless (scalar(@crit_val)==2) {
+	    	print 'ERROR: crit syntax is <min>,<max>\n';
+		exit $ERRORS{"UNKNOWN"};
+	}
+    	unless (is_real_number($crit_val[0])) {
+	    	print "ERROR: crit min must be numeric\n";
+		exit $ERRORS{"UNKNOWN"};
+	}
+    	unless (is_real_number($crit_val[1])) {
+	    	print "ERROR: crit max must be numeric\n";
+		exit $ERRORS{"UNKNOWN"};
+	}
+	if ($crit_val[0]>$crit_val[1]) {
+		print "ERROR crit thres min>max\n";
+		exit $ERRORS{"UNKNOWN"};
+	}
 }
 
-if ($warn_age>=$crit_age) {
+if (defined($warn_age) && defined($crit_age) && ($warn_age>=$crit_age)) {
 	print "ERROR warn_age>=crit_age\n";
 	exit $ERRORS{"UNKNOWN"};
 }
@@ -210,7 +253,7 @@ sub parse_reading($)
 	#
 
 	# Critical
-	if ($age>$crit_age) {
+	if (defined($crit_age) && ($age>$crit_age)) {
 		$msg.="$dev CRITICAL: stale for ${age}s\n";
 		$exitcode=$ERRORS{"CRITICAL"};
 	}
@@ -232,7 +275,7 @@ sub parse_reading($)
 	if (defined($exitcode)) { return($exitcode, $msg); }
 
 	# Warning
-	if ($age>$warn_age) {
+	if (defined($warn_age) && ($age>$warn_age)) {
 		$msg.="$dev WARNING: stale for ${age}s\n";
 		$exitcode=$ERRORS{"WARNING"};
 	}
