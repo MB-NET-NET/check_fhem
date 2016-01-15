@@ -1,3 +1,8 @@
+#
+# 2016-01-01 Michael Bussmann <support@mb-net.net>
+#
+# Based upon fs20.gplot
+
 ############################
 # Display the on and off values off an FS20 device
 # Corresponding FileLog definition:

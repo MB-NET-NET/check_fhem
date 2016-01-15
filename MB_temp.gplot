@@ -24,7 +24,7 @@ set y2tics
 set title '<L1>'
 set grid xtics y2tics
 
-set y2label "Temperatur [C]"
+set y2label "Temperatur [°C]"
 
 #FileLog 4:T\x3a|temperature:0:
 
@@ -32,4 +32,4 @@ set y2label "Temperatur [C]"
 
 plot \
   "< egrep 'T:|temperature:' <IN>"\
-     using 1:4 axes x1y2 title 'Measured temperature' with lines
+     using 1:4 axes x1y2 title 'Temperatur' with lines

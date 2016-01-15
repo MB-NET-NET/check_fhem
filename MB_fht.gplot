@@ -1,9 +1,7 @@
 #
-# 2012-02-18 Michael Bussmann <support@mb-net.net>
+# 2016-01-01 Michael Bussmann <support@mb-net.net>
 #
 # Based upon fht.gplot
-#
-# Display the measured temp, actuator and desired temp
 
 ############################
 # Display the measured temp and the actuator.
@@ -21,8 +19,11 @@ set y2tics
 set title '<L1>'
 set grid xtics y2tics
 
-set y2label "Temperatur (C)"
-set ylabel "Actuator (%)"
+set y2label "Temperatur [°C]"
+set ylabel "Actuator [%]"
+
+set yrange [0:100]
+set y2range [15:]
 
 #FileLog 4:measured:0:
 #FileLog 4:actuator.*[0-9]+%:0:int
@@ -34,8 +35,8 @@ set ylabel "Actuator (%)"
 
 plot \
   "< awk '/measured/{print $1, $4}' <IN>"\
-     using 1:2 axes x1y2 title 'Measured temperature' with lines,\
+     using 1:2 axes x1y2 title 'Ist' with lines,\
   "< awk '/actuator/ {print $1, $4+0}' <IN>"\
-     using 1:2 axes x1y1 title 'Actuator (%)' with lines.\
+     using 1:2 axes x1y1 title 'Actuator' with lines.\
   "< awk '/desired/{print $1, $4}' <IN>"\
-     using 1:2 axes x1y2 title 'Desired temperature' with points,\
+     using 1:2 axes x1y2 title 'Soll' with points,\

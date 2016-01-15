@@ -7,10 +7,10 @@ set xlabel " "
 set title '<TL>'
 set ytics
 set y2tics
-set grid xtics y2tics
+set grid xtics ytics
 set ylabel "Momentanleistung [kW]"
 set y2label "Tagesverbrauch [kWh]"
-set yrange [0:]
+set yrange [0:30]
 set y2range [0:]
 
 #DbLog <SPEC1>:gasleistung:0:

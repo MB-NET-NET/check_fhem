@@ -1,7 +1,7 @@
 #
-# Vorlau/Rücklauf Temperatur
+# Warmwasserspeicher + Vorlau/Rücklauf Temperatur Ladung
 #
-# 2015-05-17 Michael Bussmann <support@mb-net.net>
+# 2016-01-11 Michael Bussmann <support@mb-net.net>
 #
 # Filelog example:
 # define FileLog /var/log/fhem/OW_VLRL_OGR-%Y.log OW_(VL|RL)_OGR:temperature:.*
@@ -27,10 +27,13 @@ set y2range [20:75]
 
 #FileLog 4:OW_VL_:0:
 #FileLog 4:OW_RL_:0:
+#FileLog 4:OW_WW:0:
 
 #DbLog <SPEC1>:temperature:0:
 #DbLog <SPEC2>:temperature:0:
+#DbLog <SPEC3>:temperature:0:
 
 plot \
-  "< awk '/OW_VL_/ {print $1, $4}' <IN>" using 1:2 axes x1y1 title 'Vorlauf' with lines,\
-  "< awk '/OW_RL_/ {print $1, $4}' <IN>" using 1:2 axes x1y1 title 'Rücklauf' with lines
+  ls l0 axes x1y2 title 'Vorlauf' with lines lw 1, \
+  ls l1 axes x1y2 title 'Rücklauf' with lines lw 1, \
+  ls l2fill axes x1y2 title 'Wasser' with lines

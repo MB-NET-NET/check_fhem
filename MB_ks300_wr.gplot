@@ -14,7 +14,7 @@ set y2tics
 set title '<L1>'
 set grid
 
-set ylabel "Wind [Km/h]"
+set ylabel "Wind [km/h]"
 
 set y2label "Regen [l/m2]"
 set y2range [0:]
@@ -33,7 +33,7 @@ plot "<IN>" using 1:8 axes x1y1 title 'Wind' with lines,\
         if($lv) { $hv += ($F[9]-$lv); }\
         $lh = $a[1]; $ld = $a[0]; $lv = $F[9];\
         END { printf(\"${ld}_$lh:30:00 %f\n\", $hv) }'"\
-     using 1:2 axes x1y2 title 'Rain/h' with histeps,\
+     using 1:2 axes x1y2 title 'Regen/h' with histeps,\
      "<grep -v avg_ <IN> | perl -ane '\
         @a = split(\"[_]\", $F[0]);\
         if(defined($ld) && $ld ne $a[0]) {\
@@ -41,4 +41,4 @@ plot "<IN>" using 1:8 axes x1y1 title 'Wind' with lines,\
           if($lv) { $dv += ($F[9]-$lv); }\
           $ld = $a[0]; $lv = $F[9];\
           END {printf(\"${ld}_12:00:00 %f\n\", $dv)}'"\
-     using 1:2 axes x1y2 title 'Rain/day' with histeps
+     using 1:2 axes x1y2 title 'Regen/d' with histeps
